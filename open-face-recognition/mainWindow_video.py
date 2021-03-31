@@ -11,7 +11,7 @@ import time
 import os
 from PyQt5 import QtCore
 from PyQt5.QtGui import QImage, QPixmap, QFont
-from PyQt5.QtWidgets import QApplication, QDialog, QFileDialog, QGridLayout, QLabel, QPushButton, QSlider
+from PyQt5.QtWidgets import QApplication, QDialog, QFileDialog, QGridLayout, QLabel, QPushButton, QSlider, QMessageBox
 
 class MyDialog(QDialog):
     def __init__(self):
@@ -30,6 +30,14 @@ class MyDialog(QDialog):
         self.horizontalSlider.setSliderPosition(80)
         self.horizontalSlider.setOrientation(QtCore.Qt.Horizontal)
         self.horizontalSlider.setObjectName("horizontalSlider")
+        
+        self.horizontalSlider2 = QSlider(self)
+        self.horizontalSlider2.setMinimum(10)
+        self.horizontalSlider2.setMaximum(99)
+        self.horizontalSlider2.setSliderPosition(70)
+        self.horizontalSlider2.setOrientation(QtCore.Qt.Horizontal)
+        self.horizontalSlider2.setObjectName("horizontalSlider2")
+
         self.sliderValueLabel = QLabel(self)
         # self.sliderValue.setGeometry(QtCore.QRect(1170, 640, 81, 41))
         font = QFont()
@@ -40,22 +48,52 @@ class MyDialog(QDialog):
         self.sliderValueLabel.setObjectName("label")
         self.sliderValueLabel.setText("80")
 
+        self.sliderValueLabel2 = QLabel(self)
+        self.sliderValueLabel2.setFont(font)
+        self.sliderValueLabel2.setAlignment(QtCore.Qt.AlignCenter)
+        self.sliderValueLabel2.setObjectName("label2")
+        self.sliderValueLabel2.setText("70")
+
+        
+        self.sliderLabel = QLabel(self)
+        self.sliderLabel.setFont(font)
+        self.sliderLabel.setAlignment(QtCore.Qt.AlignLeft)
+        self.sliderLabel.setObjectName("labelName")
+        self.sliderLabel.setText("Detection Threshold")
+        self.sliderLabel2 = QLabel(self)
+        self.sliderLabel2.setFont(font)
+        self.sliderLabel2.setAlignment(QtCore.Qt.AlignLeft)
+        self.sliderLabel2.setObjectName("labelName2")
+        self.sliderLabel2.setText("Face Threshold")
+
         layout = QGridLayout(self)
         layout.addWidget(self.label, 0, 0, 4, 4)
-        layout.addWidget(self.sliderValueLabel, 4, 0, 1, 1)
-        layout.addWidget(self.horizontalSlider, 4, 1, 1, 1)
-        layout.addWidget(self.btnSave, 5, 1, 1, 1)
+        layout.addWidget(self.sliderLabel, 4, 0, 2, 1)
+        layout.addWidget(self.sliderValueLabel, 4, 1, 1, 1)
+        layout.addWidget(self.horizontalSlider, 4, 2, 1, 1)
+        layout.addWidget(self.sliderLabel2, 5, 0, 2, 1)
+        layout.addWidget(self.sliderValueLabel2, 5, 1, 1, 1)
+        layout.addWidget(self.horizontalSlider2, 5, 2, 1, 1)
+        layout.addWidget(self.btnSave, 6, 2, 1, 1)
 
         self.sliderValue = 80
+        self.sliderValue2 = 70
 
         self.btnSave.clicked.connect(self.saveSlot)
         self.horizontalSlider.valueChanged[int].connect(self.changevalue)
+        self.horizontalSlider2.valueChanged[int].connect(self.changevalue2)
+
+        self.isFace = False
 
     def changevalue(self,value):
         # print(value, ",", str(value))
         self.sliderValueLabel.setText(str(value))
         self.sliderValue = value
 
+    def changevalue2(self,value):
+        # print(value, ",", str(value))
+        self.sliderValueLabel2.setText(str(value))
+        self.sliderValue2 = value
     # def openSlot(self):
     #     filename, _ = QFileDialog.getOpenFileName(self, 'Open Image', 'Image', '*.png *.jpg *.bmp')
     #     if filename == '':
@@ -67,10 +105,15 @@ class MyDialog(QDialog):
     #     self.btnSave.setEnabled(True)
 
     def saveSlot(self):
-        filename, _ = QFileDialog.getSaveFileName(self, 'Save Image', 'Image', '*.png *.jpg *.bmp')
-        if filename == '':
-            return
-        cv2.imwrite(filename, self.crop_img)
+        if self.isFace :
+            filename, _ = QFileDialog.getSaveFileName(self, 'Save Image', 'Image', '*.png *.jpg *.bmp')
+            if filename == '':
+                return
+            cv2.imwrite(filename, self.crop_img)
+        else:
+            msgBox = QMessageBox()
+            msgBox.setText("No face detected!")
+            msgBox.exec()
 
     def showVedioStrem(self):
 
@@ -160,16 +203,21 @@ class MyDialog(QDialog):
                     preds = recognizer.predict_proba(vec)[0]
                     j = np.argmax(preds)
                     proba = preds[j]
+                    if proba * 100 > self.sliderValue2:
+                        self.isFace = True
+                    else:
+                        self.isFace = False
                     name = le.classes_[j]
 
                     # draw the bounding box of the face along with the
                     # associated probability
-                    text = "{}: {:.2f}%".format(name, proba * 100)
-                    y = startY - 10 if startY - 10 > 10 else startY + 10
-                    cv2.rectangle(frame, (startX, startY), (endX, endY),
-                        (0, 0, 255), 2)
-                    cv2.putText(frame, text, (startX, y),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 2)
+                    if proba * 100 > self.sliderValue2:
+                        text = "{}: {:.2f}%".format(name, proba * 100)
+                        y = startY - 10 if startY - 10 > 10 else startY + 10
+                        cv2.rectangle(frame, (startX, startY), (endX, endY),
+                            (0, 0, 255), 2)
+                        cv2.putText(frame, text, (startX, y),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 2)
 
             # update the FPS counter
             fps.update()
