@@ -16,6 +16,8 @@ import cv2
 import os
 
 from adafruit_servokit import ServoKit 
+import board
+import busio
 
 def inRange(center, range, compareValue):
 	return ((center - range) < compareValue) or (compareValue < (center + range))
@@ -109,7 +111,8 @@ time.sleep(2.0)
 
 #init Servo
 print("Init ServoKit")
-servoKit = ServoKit(channels=16, i2c_bus=0)
+i2c_bus0=(busio.I2C(board.SCL_1, board.SDA_1))
+servoKit = ServoKit(channels=16, i2c=i2c_bus0)
 servoKit.servo[0].angle = 90
 servoKit.servo[1].angle = 90
 # start the FPS throughput estimator
