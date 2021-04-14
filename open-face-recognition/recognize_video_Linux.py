@@ -81,6 +81,7 @@ while True:
 
 		# filter out weak detections
 		if confidence > args["confidence"]:
+			print("detect face!!")
 			# compute the (x, y)-coordinates of the bounding box for
 			# the face
 			box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
