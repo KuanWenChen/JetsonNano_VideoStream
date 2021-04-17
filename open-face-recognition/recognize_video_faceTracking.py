@@ -15,15 +15,26 @@ import time
 import cv2
 import os
 
-from adafruit_servokit import ServoKit 
-import board
-import busio
+# from adafruit_servokit import ServoKit 
+# import board
+# import busio
 
 def inRange(center, range, compareValue):
-	return ((center - range) < compareValue) or (compareValue < (center + range))
+	return ((center - range) <= compareValue) and (compareValue <= (center + range))
+
+def controlServo(servoKit, motorNum, angleSet):
+	if(angleSet < 0 or angleSet > 180):
+		print("Cann't set servoKit.servo[" + motorNum + "].angle = ", angleSet)
+	
+	if(angleSet < 0):
+		servoKit.servo[motorNum].angle = 0
+	elif(angleSet > 180):
+		servoKit.servo[motorNum].angle = 180
+	else:
+		servoKit.servo[motorNum].angle = angleSet
 
 def fixToWindowsCenter(servoKit, WINDOWS_SIZE, faceCenterX, faceCenterY, errorAccpet = 20, FIX_ANGLE = 3):
-	WindowsCenterX, WindowsCenterY  = WINDOWS_SIZE / 2, WINDOWS_SIZE / 2
+	WindowsCenterX, WindowsCenterY  = WINDOWS_SIZE / 2, (WINDOWS_SIZE / 2 - 100)
 	Xservo = 0
 	Yservo = 1
 	inCenter = True
@@ -33,20 +44,12 @@ def fixToWindowsCenter(servoKit, WINDOWS_SIZE, faceCenterX, faceCenterY, errorAc
 		#face too left
 		if (WindowsCenterX > faceCenterX):
 			print("Too Left! Turn camara LEFT")
-			if(servoKit.servo[Xservo].angle - FIX_ANGLE <= 0):
-				servoKit.servo[Xservo].angle = 0
-				print("Servo X angle = 0, Can't rotate more.")
-			else:
-				servoKit.servo[Xservo].angle = servoKit.servo[Xservo].angle - FIX_ANGLE
+			controlServo(servoKit, Xservo, servoKit.servo[Xservo].angle - FIX_ANGLE)
 
 		#face too right
 		if (WindowsCenterX < faceCenterX):
 			print("Too Right, Turn camara RIGHT")
-			if(servoKit.servo[Xservo].angle + FIX_ANGLE >= 180):
-				servoKit.servo[Xservo].angle = 180
-				print("Servo X angle = 180, Can't rotate more.")
-			else:
-				servoKit.servo[Xservo].angle = servoKit.servo[Xservo].angle + FIX_ANGLE
+			controlServo(servoKit, Xservo, servoKit.servo[Xservo].angle + FIX_ANGLE)
 
 	#fix Y
 	if (not inRange(WindowsCenterY, errorAccpet, faceCenterY)):
@@ -54,20 +57,12 @@ def fixToWindowsCenter(servoKit, WINDOWS_SIZE, faceCenterX, faceCenterY, errorAc
 		#face too low
 		if (WindowsCenterY > faceCenterY):
 			print("Face too low! Turn camara DOWN")
-			if(servoKit.servo[Yservo].angle - FIX_ANGLE <= 0):
-				servoKit.servo[Yservo].angle = 0
-				print("Servo Y angle = 0, Can't rotate more.")
-			else:
-				servoKit.servo[Yservo].angle = servoKit.servo[Yservo].angle - FIX_ANGLE
+			controlServo(servoKit, Xservo, servoKit.servo[Yservo].angle - FIX_ANGLE)
 
 		#face too high
 		if (WindowsCenterX < faceCenterX):
 			print("Face too high, Turn camara UP")
-			if(servoKit.servo[Yservo].angle + FIX_ANGLE >= 180):
-				servoKit.servo[Yservo].angle = 180
-				print("Servo Y angle = 180, Can't rotate more.")
-			else:	
-				servoKit.servo[Yservo].angle = servoKit.servo[Yservo].angle + FIX_ANGLE
+			controlServo(servoKit, Xservo, servoKit.servo[Yservo].angle + FIX_ANGLE)
 
 	return inCenter
 
@@ -115,14 +110,19 @@ i2c_bus0=(busio.I2C(board.SCL_1, board.SDA_1))
 servoKit = ServoKit(channels=16, i2c=i2c_bus0)
 servoKit.servo[0].angle = 90
 servoKit.servo[1].angle = 90
+
 # start the FPS throughput estimator
 fps = FPS().start()
 
 WINDOWS_SIZE = 600
 faceCenterX = 0
 faceCenterY = 0
+timer = 0
+faceImage = None
+counter = 0
 # loop over frames from the video file stream
 while True:
+	timer_Start = time.time()
 	# grab the frame from the threaded video stream
 	frame = vs.read()
 
@@ -142,6 +142,9 @@ while True:
 	detector.setInput(imageBlob)
 	detections = detector.forward()
 
+	faceCenterX = -10
+	faceCenterY = -10
+	
 	# loop over the detections
 	for i in range(0, detections.shape[2]):
 		# extract the confidence (i.e., probability) associated with
@@ -150,7 +153,6 @@ while True:
 
 		# filter out weak detections
 		if confidence > args["confidence"]:
-			print("detect face!!")
 			# compute the (x, y)-coordinates of the bounding box for
 			# the face
 			box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
@@ -160,6 +162,7 @@ while True:
 
 			# extract the face ROI
 			face = frame[startY:endY, startX:endX]
+			faceImage = frame[startY:endY, startX:endX]
 			(fH, fW) = face.shape[:2]
 
 			# ensure the face width and height are sufficiently large
@@ -191,8 +194,20 @@ while True:
 
 	# update the FPS counter
 	fps.update()
-	if( fixToWindowsCenter(servoKit, WINDOWS_SIZE, faceCenterX, faceCenterY) ):
-		print("face in center")
+	timer = timer + (time.time() - timer_Start)
+	if(faceCenterX < 0 and faceCenterY < 0):
+		print("no face detect")
+		timer = 0
+	elif( fixToWindowsCenter("servoKit", WINDOWS_SIZE, faceCenterX, faceCenterY) ):
+		print("face in center, timer: ", timer)
+
+		if(timer > 3):
+			print("take a picture! save as " + str("face" + str(counter) + ".jpg"))
+			timer = 0
+			cv2.imwrite(str("face" + str(counter) + ".jpg"), faceImage)
+			counter = counter + 1
+	else:
+		timer = 0
 
 	# show the output frame
 	# cv2.imshow("Frame", frame)
