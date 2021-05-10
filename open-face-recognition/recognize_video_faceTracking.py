@@ -15,25 +15,27 @@ import time
 import cv2
 import os
 
-# from adafruit_servokit import ServoKit 
-# import board
-# import busio
+from adafruit_servokit import ServoKit 
+import board
+import busio
 
 def inRange(center, range, compareValue):
 	return ((center - range) <= compareValue) and (compareValue <= (center + range))
 
 def controlServo(servoKit, motorNum, angleSet):
-	if(angleSet < 0 or angleSet > 180):
-		print("Cann't set servoKit.servo[" + motorNum + "].angle = ", angleSet)
-	
-	if(angleSet < 0):
-		servoKit.servo[motorNum].angle = 0
-	elif(angleSet > 180):
-		servoKit.servo[motorNum].angle = 180
-	else:
-		servoKit.servo[motorNum].angle = angleSet
 
-def fixToWindowsCenter(servoKit, WINDOWS_SIZE, faceCenterX, faceCenterY, errorAccpet = 20, FIX_ANGLE = 3):
+    print("controlServo, servoKit[" + str(motorNum) + "] = " + str(angleSet))
+    if(angleSet < 0 or angleSet > 180):
+        print("Cann't set servoKit.servo[" + str(motorNum) + "].angle = " + str(angleSet))
+	
+    if(angleSet < 0):
+    	servoKit.servo[motorNum].angle = 0
+    elif(angleSet > 180):
+    	servoKit.servo[motorNum].angle = 180
+    else:
+    	servoKit.servo[motorNum].angle = angleSet
+
+def fixToWindowsCenter(servoKit, WINDOWS_SIZE, faceCenterX, faceCenterY, errorAccpet = 20, FIX_ANGLE = 10):
 	WindowsCenterX, WindowsCenterY  = WINDOWS_SIZE / 2, (WINDOWS_SIZE / 2 - 100)
 	Xservo = 0
 	Yservo = 1
@@ -198,7 +200,7 @@ while True:
 	if(faceCenterX < 0 and faceCenterY < 0):
 		print("no face detect")
 		timer = 0
-	elif( fixToWindowsCenter("servoKit", WINDOWS_SIZE, faceCenterX, faceCenterY) ):
+	elif( fixToWindowsCenter(servoKit, WINDOWS_SIZE, faceCenterX, faceCenterY) ):
 		print("face in center, timer: ", timer)
 
 		if(timer > 3):
@@ -210,7 +212,7 @@ while True:
 		timer = 0
 
 	# show the output frame
-	# cv2.imshow("Frame", frame)
+	cv2.imshow("Frame", frame)
 	key = cv2.waitKey(1) & 0xFF
 
 	# if the `q` key was pressed, break from the loop
